@@ -1,0 +1,7 @@
+# Arquivos gerados pela IDE
+.classpath
+.project
+.settings/
+.idea/
+poupador.iml
+classes/
