@@ -35,7 +35,7 @@ public class Ladrao extends ProgramaLadrao {
 		/* por enquanto a gente só ta verificando os poupadores, porém temos que verificar os rastros e os ladroes para fazer
 		a coordenação */
 
-		HashMap<int[], Integer> direction = checkDirections(directions(vision));
+		HashMap<int[], Integer> direction = checkDirections(directions(vision)); // melhor direção
 
 		ArrayList<int[]> positions = new ArrayList<>(); // posicoes dos poupadores encontrados nessa direção
 
@@ -93,18 +93,8 @@ public class Ladrao extends ProgramaLadrao {
 				index = i;
 			}
 		}
-		switch (index){
-			case 0:
-				return directions.get(0);
-			case 1:
-				return directions.get(1);
-			case 2:
-				return directions.get(2);
-			case 3:
-				return directions.get(3);
-			default:
-				return null;
-		}
+
+		return directions.get(index);
 	}
 
 	public int calculateWeight(HashMap<int[], Integer> direction){
@@ -120,6 +110,7 @@ public class Ladrao extends ProgramaLadrao {
 	}
 	public ArrayList<HashMap<int[], Integer>> directions(int[][] vision) {
 		// Cima, baixo, direita, esquerda
+		//  0      1       2         3
 		ArrayList<HashMap<int[], Integer>> directions = new ArrayList<HashMap<int[], Integer>>();
 
 		HashMap<int[], Integer> up = new HashMap<>(); // posição e valor
