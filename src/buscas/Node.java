@@ -3,14 +3,14 @@ package buscas;
 import java.util.Objects;
 
 public class Node {
-    public int row, col;  // Coordenadas do nó no grafo
+    public int linha, coluna;  // Coordenadas do nó no grafo
     int g;     // Custo real do início até este nó
     int h;     // Estimativa heurística do custo deste nó até o destino
     Node parent;  // Nó pai no caminho
-    public int act;
+    public int acao;
     public Node(int x, int y) {
-        this.row = x;
-        this.col = y;
+        this.linha = x;
+        this.coluna = y;
     }
 
     public int f() {
@@ -22,11 +22,11 @@ public class Node {
         if (this == obj) return true;
         if (obj == null || getClass() != obj.getClass()) return false;
         Node node = (Node) obj;
-        return row == node.row && col == node.col;
+        return linha == node.linha && coluna == node.coluna;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(row, col);
+        return Objects.hash(linha, coluna);
     }
 }
