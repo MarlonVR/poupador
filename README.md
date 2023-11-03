@@ -13,7 +13,7 @@ Este projeto é parte da disciplina de Inteligência Artificial da Universidade 
 
 ## Ambiente
 - O jogo se passa em um labirinto com moedas, pastilhas de poder, e agências bancárias.
-- O labirinto é representado por uma matriz de células, e a configuração muda no dia da avaliação.
+- O labirinto é representado por uma matriz de células.
 
 ## Sensores e Atuadores
 - Os agentes têm sensores visuais e olfativos para perceber o ambiente.
