@@ -1,15 +1,156 @@
 package agente;
-
 import algoritmo.ProgramaLadrao;
-import buscas.Node;
-
 import java.util.*;
 
-
-import static buscas.AStar.aStar;
+import static agente.Ladrao.AStar.aStar;
 
 public class Ladrao extends ProgramaLadrao {
+	public static class Node {
+		public int linha, coluna;  // Coordenadas do nó no grafo
+		int g;     // Custo real do início até este nó
+		int h;     // Estimativa heurística do custo deste nó até o destino
+		Node parent;  // Nó pai no caminho
+		public int acao;
+		public Node(int x, int y) {
+			this.linha = x;
+			this.coluna = y;
+		}
 
+		public int f() {
+			return g + h;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (obj == null || getClass() != obj.getClass()) return false;
+			Node node = (Node) obj;
+			return linha == node.linha && coluna == node.coluna;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(linha, coluna);
+		}
+	}
+
+	public class AStar {
+		public static List<Node> aStar(int[][] mapa, Node inicio, Node objetivo) {
+			Set<Node> aberto = new HashSet<>();
+			Set<Node> fechado = new HashSet<>();
+			aberto.add(inicio);
+
+			while (!aberto.isEmpty()) {
+				Node atual = null;
+				for (Node node : aberto) {
+					if (atual == null || node.f() < atual.f()) {
+						atual = node;
+					}
+				}
+
+				if (atual.equals(objetivo)) {
+					return reconstruirCaminho(atual);
+				}
+
+				aberto.remove(atual);
+				fechado.add(atual);
+
+				for (Node vizinho : getVizinhos(atual, mapa)) {
+					if (fechado.contains(vizinho)) {
+						continue;
+					}
+
+					int custoG = atual.g + 1;  // Distância entre nós é 1
+					// custo do nó atual para o vizinho
+
+					if (!aberto.contains(vizinho) || custoG < vizinho.g) {
+						vizinho.parent = atual;
+						vizinho.g = custoG;
+						vizinho.h = heuristica(vizinho, objetivo);
+						aberto.add(vizinho);
+					}
+				}
+			}
+
+			return null;  // Caminho não encontrado
+		}
+
+		public static List<Node> reconstruirCaminho(Node current) {
+			List<Node> path = new ArrayList<>();
+			while (current != null) {
+				path.add(current);
+				current = current.parent;
+			}
+			Collections.reverse(path);
+			return path;
+		}
+
+		public static int heuristica(Node a, Node b) {
+			return Math.abs(a.linha - b.linha) + Math.abs(a.coluna - b.coluna);  // Heurística de Manhattan
+		}
+
+		public static List<Node> getVizinhos(Node node, int[][] mapa) {
+			List<Node> vizinhos = new ArrayList<>();
+			int linhas = mapa.length;
+			int colunas = mapa[0].length;
+			int x = node.linha;
+			int y = node.coluna;
+
+			if (x > 0 && mapa[x - 1][y] == 0 || x > 0 && mapa[x - 1][y] >= 100 && mapa[x - 1][y] < 200) { // cima
+				vizinhos.add(new Node(x - 1, y));
+				vizinhos.get(vizinhos.size()-1).acao = 1;
+			}
+			if (x < linhas - 1 && mapa[x + 1][y] == 0 || x < linhas - 1 && mapa[x + 1][y] >= 100 && mapa[x + 1][y] < 200) { // baixo
+				vizinhos.add(new Node(x + 1, y));
+				vizinhos.get(vizinhos.size()-1).acao = 2;
+			}
+			if (y > 0 && mapa[x][y - 1] == 0 || y > 0 && mapa[x][y - 1] >= 100 && mapa[x][y - 1] < 200) { // esquerda
+				vizinhos.add(new Node(x, y - 1));
+				vizinhos.get(vizinhos.size()-1).acao = 4;
+			}
+			if (y < colunas - 1 && mapa[x][y + 1] == 0 || y < colunas - 1 && mapa[x][y + 1] >= 100 && mapa[x][y + 1] < 200) { // direita
+				vizinhos.add(new Node(x, y + 1));
+				vizinhos.get(vizinhos.size()-1).acao = 3;
+			}
+
+			return vizinhos;
+		}
+	}
+
+	public class Elemento{
+		Coordenada posicao;
+		int valor;
+
+		public Elemento(Coordenada posicao, int valor){
+			this.posicao = posicao;
+			this.valor = valor;
+		}
+
+		public Coordenada getPosicao(){
+			return posicao;
+		}
+
+		public int getValor(){
+			return valor;
+		}
+	}
+
+	public class Coordenada{
+		int x, y;
+
+		public Coordenada(int x, int y){
+			this.x = x;
+			this.y = y;
+
+		}
+
+		public int getX(){
+			return x;
+		}
+		public int getY(){
+			return y;
+		}
+	}
 	List<Node> caminho;
 	public int acao() {
 
@@ -17,10 +158,18 @@ public class Ladrao extends ProgramaLadrao {
 	}
 
 	public int andar() {
+		if(sensor.getPosicao().getX() == 0 && sensor.getPosicao().getY() == 0 || sensor.getPosicao().getX() == 0 && sensor.getPosicao().getY() == 29 || sensor.getPosicao().getX() == 29 && sensor.getPosicao().getY() == 0){
+			return 0; //fazendo os outros ladroes nao serem executados para nao atrapalhar no debug
+		}
+
 		if (caminho == null || caminho.isEmpty()) {
 			int[][] visao = getVisao();
 			caminho = aStar(visao, new Node(2, 2), heuristica(visao));
-			if (caminho != null) return caminho.remove(0).acao;
+
+			if (caminho != null) {
+				int removido = caminho.remove(0).acao; //tirando a primeira posicao, pois sempre a ação do primeiro nó é = 0 (ficar parado)
+				return caminho.remove(0).acao;
+			}
 		}
 		else {
 			return caminho.remove(0).acao;
@@ -29,41 +178,39 @@ public class Ladrao extends ProgramaLadrao {
 	}
 
 	public Node heuristica(int[][] visao){
-		HashMap<int[], Integer> melhorDirecao = melhorDirecao(direcoes(visao));
+		ArrayList<Elemento> melhorDirecao = melhorDirecao(direcoes(visao));
 
-		ArrayList<int[]> posicoes = new ArrayList<>(); // posicoes dos elementos encontrados na melhorDirecao
+		ArrayList<Coordenada> posicoes = new ArrayList<>();
 
-		int[] chaveAux = {-100}; // seguindo rastro
-		if(melhorDirecao.containsKey(chaveAux)){
-			switch (melhorDirecao.get(chaveAux)){
-				case 1:
+		//se o tamanho da lista(melhorDirecao) for igual a 1, o valor que está nessa posicao significa o movimento a ser feito
+		if(melhorDirecao.size() == 1){
+			switch (melhorDirecao.get(0).getValor()){
+				case 0: //cima
 					return new Node(1, 2);
-				case 2:
+				case 1: // baixo
 					return new Node(3, 2);
-				case 3:
+				case 2: // direita
 					return new Node(2, 3);
-				case 4:
+				case 3: // esquerda
 					return new Node(2, 1);
 			}
 		}
 
-		for (Map.Entry<int[], Integer> entry : melhorDirecao.entrySet()) {
-			int[] key = entry.getKey();
-			int value = entry.getValue();
-			if(value >= 100 && value < 200){ // verificando se tem poupador
-				posicoes.add(key);
+		for (Elemento elemento : melhorDirecao) {
+			if(elemento.getValor() >= 100 && elemento.getValor() < 200){ // verificando se tem poupadores
+				posicoes.add(elemento.getPosicao());
 			}
 		}
 
-		int[] posicaoObjetivo = new int[2];
+		Coordenada posicaoObjetivo = new Coordenada(2, 2); // valores qualquer para inicializar
 
 		if(!posicoes.isEmpty()){ // verificar qual dos elementos esta mais perto
-			int menor = Manhattan(new int[] {2, 2}, posicoes.get(0));
+			int menor = Manhattan(new Coordenada(2, 2), posicoes.get(0));
 			posicaoObjetivo = posicoes.get(0);
 			int aux;
 
 			for(int i = 1; i<posicoes.size(); i++){
-				aux = Manhattan(new int[] {2, 2}, posicoes.get(i));
+				aux = Manhattan(new Coordenada(2, 2), posicoes.get(i));
 				if(menor > aux){
 					menor = aux;
 					posicaoObjetivo = posicoes.get(i);
@@ -72,171 +219,205 @@ public class Ladrao extends ProgramaLadrao {
 		}
 		else{
 			do {
-				posicaoObjetivo[0] = (int) (Math.random() * 5);
-				posicaoObjetivo[1] = (int) (Math.random() * 5);
-			} while (posicaoObjetivo[0] == 2 && posicaoObjetivo[1] == 2); // verificando se nao é a posição do proprio ladrao
+				posicaoObjetivo.x = (int) (Math.random() * 5);
+				posicaoObjetivo.y = (int) (Math.random() * 5);
+			} while (posicaoObjetivo.getX() == 2 && posicaoObjetivo.getY() == 2); // verificando se nao é a posição do proprio ladrao
 		}
 
-		return new Node(posicaoObjetivo[0], posicaoObjetivo[1]);
+		return new Node(posicaoObjetivo.getX(), posicaoObjetivo.getY());
 	}
-	public int Manhattan(int[] a, int[] b){ // calcular distancia
-		return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
+	public int Manhattan(Coordenada a, Coordenada b){ // calcular distancia
+
+		return Math.abs(a.getX() - b.getX()) + Math.abs(a.getY() - b.getY());
 	}
 
-	public HashMap<int[], Integer> melhorDirecao(ArrayList<HashMap<int[], Integer>> direcoes){
-		// Arraylist com as posicoes e os olfatos
-		// posição 0 -> cima
-		// posição 1 -> baixo
-		// posição 2 -> direita
-		// posição 3 -> esquerda
-		//                                       olfatoCimaPoupador  olfatoCimaLadrao
-		int bigger = calcularPeso(direcoes.get(0), direcoes.get(4), direcoes.get(8));
+	public ArrayList<Elemento> melhorDirecao(HashMap<String, ArrayList<Elemento>> direcoes){
+
+		int bigger = calcularPeso(direcoes.get("cima"), direcoes.get("olfatoCimaPoupador"), direcoes.get("olfatoCimaLadrao"));
 		int index = 0;
+		int peso;
 
-		for(int i = 1; i<4; i++){
-			if(bigger < calcularPeso(direcoes.get(i), direcoes.get(i+4), direcoes.get(i+8))){
-				bigger = calcularPeso(direcoes.get(i), direcoes.get(i+4), direcoes.get(i+8));
+		for(int i = 1; i < 4; i++) {
+			if(i == 1) {
+				peso = calcularPeso(direcoes.get("baixo"), direcoes.get("olfatoBaixoPoupador"), direcoes.get("olfatoBaixoLadrao"));
+			} else if(i == 2) {
+				peso = calcularPeso(direcoes.get("direita"), direcoes.get("olfatoDireitaPoupador"), direcoes.get("olfatoDireitaLadrao"));
+			} else {
+				peso = calcularPeso(direcoes.get("esquerda"), direcoes.get("olfatoEsquerdaPoupador"), direcoes.get("olfatoEsquerdaLadrao"));
+			}
+
+			if(bigger < peso) {
+				bigger = peso;
 				index = i;
 			}
 		}
 
-		/*
-		* 0 - Ficar Parado() – o agente fica parado e não perde energia
-		  1 - MoverCima() – move o agente uma posição acima da atual
-	      2 - MoverBaixo() – move o agente uma posição abaixo da atual
-	      3 - MoverDireita() – move o agente uma posição a direita da atual
-	      4 - MoverEsquerda() – move o agente uma posição a esquerda da atual */
 
 		if(bigger < 100){ // Se tiver somente rastro na visao
-			HashMap<int[], Integer> aux = new HashMap<int[], Integer>();
-			aux.put(new int []{-100}, index + 1);
-			// colocando -100 na chave para saber que o hashmap de retorno não é com valores da visao
-			// e sim do olfato. Sendo o seu valor o movimento a se fazer. (valores de 1 a 4)
+			ArrayList<Elemento> aux = new ArrayList<>();
+			aux.add(new Elemento(new Coordenada(99, 99), index)); //coordenada qualquer, pq o importante é só o valor
+			return aux;
+			// quando retornar uma lista com somente 1 posicao, quer dizer que o valor dessa posicao vai ser o movimento a ser feito
+			//0 -> cima, 1 -> baixo, 2 -> direita, 3 -> esquerda
 		}
-		return direcoes.get(index);
+
+		if(index == 0){
+			System.out.println("melhor direção é a para cima. Peso -> " + bigger);
+			return direcoes.get("cima");
+		}
+		else if(index == 1){
+			System.out.println("melhor direção é a para baixo. Peso -> " + bigger);
+			return direcoes.get("baixo");
+		}
+		else if(index == 2){
+			System.out.println("melhor direção é a para direita. Peso -> " + bigger);
+			return direcoes.get("direita");
+		}
+		else{
+			System.out.println("melhor direção é a para esquerda. Peso -> " + bigger);
+			return direcoes.get("esquerda");
+		}
 	}
 
-	public int calcularPeso(HashMap<int[], Integer> direcao, HashMap<int[], Integer> olfatoPoupador, HashMap<int[], Integer> olfatoLadrao){
+	public int calcularPeso(ArrayList<Elemento> direcao, ArrayList<Elemento> olfatoPoupador, ArrayList<Elemento> olfatoLadrao){
 		// peso poupador -> 200
 		// peso rastro poupador -> 15
 		// peso ladrao -> 10
 		// peso rastro ladrao -> 1
 
 		int contador = 0;
-		for(int i = 0; i<=10; i+=10){
-			if(direcao.containsValue(100 + i)){ //contando quant. poupadores
+
+		for (Elemento elemento : direcao) {
+			if(elemento.getValor() >= 100 &&  elemento.getValor() < 200){ // procurando poupador
 				contador+=200;
 			}
-		}
-		for(int i = 0; i<=30; i+=10){
-			if(direcao.containsValue(200 + i)){//contando quant. ladroes
+			else if(elemento.getValor() >= 200){ // procurando ladrao
 				contador+=10;
 			}
 		}
 
 		if(contador == 0){ // caso nao tenha poupadores ou ladroes, vamos verificar se tem rastros
-			for(int i = 1; i<=5; i++){
-				if(olfatoPoupador.containsValue(i)){
+			for (Elemento elemento : olfatoPoupador) {
+				if(elemento.getValor() >= 1 &&  elemento.getValor() < 5){
 					contador+=15;
 					break;
 				}
 			}
-			/*for(int i = 1; i<=5; i++){   Por enquanto ta seguindo o proprio rastro
-				if(olfatoLadrao.containsValue(i)){
+			/*for (Elemento elemento : olfatoLadrao) {
+				if(elemento.getValor() >= 1 &&  elemento.getValor() < 5){
 					contador+=1;
-					return contador;
+					break;
 				}
 			}*/
+
+			if(contador == 0){
+				for (Elemento elemento : direcao) {
+					if(elemento.getValor() == -1 ||  elemento.getValor() == -2 || elemento.getValor() == 1 ){
+						contador-=1;
+					}
+				}
+			}
 		}
 
 		return contador;
 	}
-	public ArrayList<HashMap<int[], Integer>> direcoes(int[][] visao) {
+	public HashMap<String, ArrayList<Elemento>> direcoes(int[][] visao) {
 		// Cima, baixo, direita, esquerda
 		//  0      1       2         3
-		ArrayList<HashMap<int[], Integer>> direcoes = new ArrayList<HashMap<int[], Integer>>();
+		HashMap<String, ArrayList<Elemento>> direcoes = new HashMap<>();
 
-		HashMap<int[], Integer> cima = new HashMap<>(); // posição e valor
-		HashMap<int[], Integer> baixo = new HashMap<>();
-		HashMap<int[], Integer> esquerda = new HashMap<>();
-		HashMap<int[], Integer> direita = new HashMap<>();
+		ArrayList<Elemento> cima = new ArrayList<Elemento>();
+		ArrayList<Elemento> baixo = new ArrayList<Elemento>();
+		ArrayList<Elemento> esquerda = new ArrayList<Elemento>();
+		ArrayList<Elemento> direita = new ArrayList<Elemento>();
 
 		for (int i = 0; i < 2; i++) {
 			for (int j = 0; j < 5; j++) {
-				cima.put(new int[] {i, j}, visao[i][j]);
+				cima.add(new Elemento(new Coordenada(i, j), visao[i][j]));
 			}
 		}
-
-		esquerda.put(new int[] {2, 0}, visao[2][0]);
-		esquerda.put(new int[] {2, 1}, visao[2][1]);
-		direita.put(new int[] {2, 3}, visao[2][3]);
-		direita.put(new int[] {2, 4}, visao[2][4]);
-
+		for (int i = 0; i < 5; i++) {
+			for (int j = 0; j < 2; j++) {
+				esquerda.add(new Elemento(new Coordenada(i, j), visao[i][j]));
+			}
+		}
+		for (int i = 0; i < 5; i++) {
+			for (int j = 3; j < 5; j++) {
+				direita.add(new Elemento(new Coordenada(i, j), visao[i][j]));
+			}
+		}
 		for (int i = 3; i < 5; i++) {
 			for (int j = 0; j < 5; j++) {
-				baixo.put(new int[] {i, j}, visao[i][j]);
+				baixo.add(new Elemento(new Coordenada(i, j), visao[i][j]));
 			}
 		}
 
-		HashMap<int[], Integer> olfatoCimaPoupador = new HashMap<>();
-		HashMap<int[], Integer> olfatoBaixoPoupador = new HashMap<>();
-		HashMap<int[], Integer> olfatoEsquerdaPoupador = new HashMap<>();
-		HashMap<int[], Integer> olfatoDireitaPoupador = new HashMap<>();
+		ArrayList<Elemento> olfatoCimaPoupador = new ArrayList<Elemento>();
+		ArrayList<Elemento> olfatoBaixoPoupador = new ArrayList<Elemento>();
+		ArrayList<Elemento> olfatoEsquerdaPoupador = new ArrayList<Elemento>();
+		ArrayList<Elemento> olfatoDireitaPoupador = new ArrayList<Elemento>();
 
-		HashMap<int[], Integer> olfatoCimaLadrao = new HashMap<>();
-		HashMap<int[], Integer> olfatoBaixoLadrao = new HashMap<>();
-		HashMap<int[], Integer> olfatoEsquerdaLadrao = new HashMap<>();
-		HashMap<int[], Integer> olfatoDireitaLadrao = new HashMap<>();
+		ArrayList<Elemento> olfatoCimaLadrao = new ArrayList<Elemento>();
+		ArrayList<Elemento> olfatoBaixoLadrao = new ArrayList<Elemento>();
+		ArrayList<Elemento> olfatoEsquerdaLadrao = new ArrayList<Elemento>();
+		ArrayList<Elemento> olfatoDireitaLadrao = new ArrayList<Elemento>();
 
 		int[][] olfatoPoupador = getOlfatoPoupador();
 		int[][] olfatoLadrao = getOlfatoLadrao();
 
-		olfatoCimaPoupador.put(new int[] {0, 0}, olfatoPoupador[0][0]);
-		olfatoCimaPoupador.put(new int[] {0, 1}, olfatoPoupador[0][1]);
-		olfatoCimaPoupador.put(new int[] {0, 2}, olfatoPoupador[0][2]);
-		olfatoEsquerdaPoupador.put(new int[] {0, 0}, olfatoPoupador[0][0]);
-		olfatoEsquerdaPoupador.put(new int[] {1, 0}, olfatoPoupador[1][0]);
-		olfatoEsquerdaPoupador.put(new int[] {2, 0}, olfatoPoupador[2][0]);
-		olfatoDireitaPoupador.put(new int[] {0, 2}, olfatoPoupador[0][2]);
-		olfatoDireitaPoupador.put(new int[] {1, 2}, olfatoPoupador[1][2]);
-		olfatoDireitaPoupador.put(new int[] {2, 2}, olfatoPoupador[2][2]);
-		olfatoBaixoPoupador.put(new int[] {2, 0}, olfatoPoupador[2][0]);
-		olfatoBaixoPoupador.put(new int[] {2, 1}, olfatoPoupador[2][1]);
-		olfatoBaixoPoupador.put(new int[] {2, 2}, olfatoPoupador[2][2]);
+		for (int i = 0; i < olfatoPoupador.length; i++) {
+			for (int j = 0; j < olfatoPoupador[i].length; j++) {
+				// Cima e Baixo compartilham a mesma coluna (j = 1)
+				if (i == 0) {
+					olfatoCimaPoupador.add(new Elemento(new Coordenada(i, j), olfatoPoupador[i][j]));
+				} else if (i == 2) {
+					olfatoBaixoPoupador.add(new Elemento(new Coordenada(i, j), olfatoPoupador[i][j]));
+				}
 
-		olfatoCimaLadrao.put(new int[] {0, 0}, olfatoLadrao[0][0]);
-		olfatoCimaLadrao.put(new int[] {0, 1}, olfatoLadrao[0][1]);
-		olfatoCimaLadrao.put(new int[] {0, 2}, olfatoLadrao[0][2]);
-		olfatoEsquerdaLadrao.put(new int[] {0, 0}, olfatoLadrao[0][0]);
-		olfatoEsquerdaLadrao.put(new int[] {1, 0}, olfatoLadrao[1][0]);
-		olfatoEsquerdaLadrao.put(new int[] {2, 0}, olfatoLadrao[2][0]);
-		olfatoDireitaLadrao.put(new int[] {0, 2}, olfatoLadrao[0][2]);
-		olfatoDireitaLadrao.put(new int[] {1, 2}, olfatoLadrao[1][2]);
-		olfatoDireitaLadrao.put(new int[] {2, 2}, olfatoLadrao[2][2]);
-		olfatoBaixoLadrao.put(new int[] {2, 0}, olfatoLadrao[2][0]);
-		olfatoBaixoLadrao.put(new int[] {2, 1}, olfatoLadrao[2][1]);
-		olfatoBaixoLadrao.put(new int[] {2, 2}, olfatoLadrao[2][2]);
+				// Esquerda e Direita compartilham a mesma linha (i = 1)
+				if (j == 0) {
+					olfatoEsquerdaPoupador.add(new Elemento(new Coordenada(i, j), olfatoPoupador[i][j]));
+				} else if (j == 2) {
+					olfatoDireitaPoupador.add(new Elemento(new Coordenada(i, j), olfatoPoupador[i][j]));
+				}
+			}
+		}
+
+		for (int i = 0; i < olfatoLadrao.length; i++) {
+			for (int j = 0; j < olfatoLadrao[i].length; j++) {
+				if (i == 0) {
+					olfatoCimaLadrao.add(new Elemento(new Coordenada(i, j), olfatoLadrao[i][j]));
+				} else if (i == 2) {
+					olfatoBaixoLadrao.add(new Elemento(new Coordenada(i, j), olfatoLadrao[i][j]));
+				}
+
+				if (j == 0) {
+					olfatoEsquerdaLadrao.add(new Elemento(new Coordenada(i, j), olfatoLadrao[i][j]));
+				} else if (j == 2) {
+					olfatoDireitaLadrao.add(new Elemento(new Coordenada(i, j), olfatoLadrao[i][j]));
+				}
+			}
+		}
 
 
+		direcoes.put("cima", cima);
+		direcoes.put("baixo", baixo);
+		direcoes.put("direita", direita);
+		direcoes.put("esquerda", esquerda);
 
-		direcoes.add(cima);
-		direcoes.add(baixo);
-		direcoes.add(direita);
-		direcoes.add(esquerda);
+		direcoes.put("olfatoCimaLadrao", olfatoCimaLadrao);
+		direcoes.put("olfatoBaixoLadrao", olfatoBaixoLadrao);
+		direcoes.put("olfatoEsquerdaLadrao", olfatoEsquerdaLadrao);
+		direcoes.put("olfatoDireitaLadrao", olfatoDireitaLadrao);
 
-		direcoes.add(olfatoCimaPoupador);
-		direcoes.add(olfatoBaixoPoupador);
-		direcoes.add(olfatoEsquerdaPoupador);
-		direcoes.add(olfatoDireitaPoupador);
+		direcoes.put("olfatoCimaPoupador", olfatoCimaPoupador);
+		direcoes.put("olfatoBaixoPoupador", olfatoBaixoPoupador);
+		direcoes.put("olfatoEsquerdaPoupador", olfatoEsquerdaPoupador);
+		direcoes.put("olfatoDireitaPoupador", olfatoDireitaPoupador);
 
-		direcoes.add(olfatoCimaLadrao);
-		direcoes.add(olfatoBaixoLadrao);
-		direcoes.add(olfatoEsquerdaLadrao);
-		direcoes.add(olfatoDireitaLadrao);
 
 		return direcoes;
 	}
-
 
 	public int[][] getVisao(){
 		int[][] matriz = new int[5][5];
