@@ -4,25 +4,62 @@ import algoritmo.ProgramaLadrao;
 import buscas.Node;
 
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 
 import static buscas.AStar.aStar;
 
 public class Ladrao extends ProgramaLadrao {
 
+	public static class Temporizador {
+		static private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(7);
+		private int moedas;
+		static boolean assaltoLiberado = true;
+		public static void iniciarTemp() {
+			// Comando para iniciar uma tarefa após um atraso de 5 segundos
+			final Runnable runnable = new Runnable() {
+				public void run() {
+					System.out.println("Poupador assaltado!");
+					assaltoLiberado = true;
+				}
+			};
+
+			// Agendar a tarefa após 5 segundos
+			scheduler.schedule(runnable, 5, TimeUnit.SECONDS);
+		}
+	}
 	List<Node> caminho;
 	private LinkedList<double[]> ultimasPosicoes = new LinkedList<>();
-
 	int[] chaveAux = {-100};
+	double x,y;
+	int moedas = 0;
 
-	public double[] coordenadasRelativasParaAbsolutas(double[] coordenadasRelativas) {
+	Timer timer = new Timer();
+
+	public double[] coordenadasRelativasParaAbsolutas(double[] coordenadasRelativas, double x, double y) {
 		double linhaAbsoluta = sensor.getPosicao().getY() - 2 + coordenadasRelativas[0];
 		double colunaAbsoluta = sensor.getPosicao().getX() - 2 + coordenadasRelativas[1];
 		return new double[]{colunaAbsoluta, linhaAbsoluta};
 	}
 
 	public int acao() {
-		double[] posicaoAtual = {sensor.getPosicao().getX(), sensor.getPosicao().getY()};
+		if(moedas < sensor.getNumeroDeMoedas()){
+			try{
+				Temporizador.assaltoLiberado = false;
+				Temporizador.iniciarTemp();
+			}catch (Exception e){
+				//
+			}
+		}
+
+		moedas = sensor.getNumeroDeMoedas();
+
+		x = sensor.getPosicao().getX();
+		y = sensor.getPosicao().getY();
+
+		double[] posicaoAtual = {x, y};
 		ultimasPosicoes.add(posicaoAtual);
 
 		if (ultimasPosicoes.size() > 10) {
@@ -43,6 +80,7 @@ public class Ladrao extends ProgramaLadrao {
 			if(objetivo != null){
 				caminho = aStar(visao, new Node(2, 2), objetivo);
 				if (caminho != null) {
+					int aux = caminho.remove(0).acao;
 					return caminho.remove(0).acao;
 				}
 			}
@@ -55,7 +93,7 @@ public class Ladrao extends ProgramaLadrao {
 		do{
 			direcao = (int) (Math.random() * 5);
 		}while (direcaoVisitada(direcao));
-		System.out.println("ALEATORIO EVITANDO DIRECAO JA VISITADA");
+
 		return direcao;
 	}
 	public boolean direcaoVisitada(int direcao) {
@@ -77,7 +115,7 @@ public class Ladrao extends ProgramaLadrao {
 				return false;
 		}
 
-		double[] coordenadaProxima = coordenadasRelativasParaAbsolutas(coordenadasRelativas);
+		double[] coordenadaProxima = coordenadasRelativasParaAbsolutas(coordenadasRelativas, x, y);
 
 		for (double[] posicao : ultimasPosicoes) {
 			if (Arrays.equals(posicao, coordenadaProxima)) {
@@ -91,8 +129,6 @@ public class Ladrao extends ProgramaLadrao {
 	public Node heuristica(int[][] visao){
 		HashMap<int[], Integer> melhorDirecao = melhorDirecao(direcoes(visao));
 
-		ArrayList<int[]> posicoes = new ArrayList<>(); // posicoes dos elementos encontrados na melhorDirecao
-
 		if(melhorDirecao.containsKey(chaveAux)){
 			switch (melhorDirecao.get(chaveAux)){
 				case 1:
@@ -105,6 +141,8 @@ public class Ladrao extends ProgramaLadrao {
 					return new Node(2, 1);
 			}
 		}
+
+		ArrayList<int[]> posicoes = new ArrayList<>(); // posicoes dos elementos encontrados na melhorDirecao
 
 		for (Map.Entry<int[], Integer> entry : melhorDirecao.entrySet()) {
 			int[] key = entry.getKey();
@@ -146,10 +184,13 @@ public class Ladrao extends ProgramaLadrao {
 		//                                       olfatoCimaPoupador  olfatoCimaLadrao
 		int bigger = calcularPeso(direcoes.get(0), direcoes.get(4), direcoes.get(8));
 		int index = 0;
+		int peso;
 
 		for(int i = 1; i<4; i++){
-			if(bigger < calcularPeso(direcoes.get(i), direcoes.get(i+4), direcoes.get(i+8))){
-				bigger = calcularPeso(direcoes.get(i), direcoes.get(i+4), direcoes.get(i+8));
+			peso = calcularPeso(direcoes.get(i), direcoes.get(i+4), direcoes.get(i+8));
+
+			if(bigger < peso){
+				bigger = peso;
 				index = i;
 			}
 		}
@@ -166,7 +207,7 @@ public class Ladrao extends ProgramaLadrao {
 			aux.put(chaveAux, index + 1);
 			return aux;
 			// colocando -100 na chave para saber que o hashmap de retorno não é com valores da visao
-			// e sim do olfato. Sendo o seu valor o movimento a se fazer. (valores de 1 a 4)
+			// Sendo o seu valor o movimento a ser feito. (valores de 1 a 4)
 		}
 
 		return direcoes.get(index);
@@ -175,22 +216,17 @@ public class Ladrao extends ProgramaLadrao {
 	public int calcularPeso(HashMap<int[], Integer> direcao, HashMap<int[], Integer> olfatoPoupador, HashMap<int[], Integer> olfatoLadrao){
 		// peso poupador -> 200
 		// peso rastro poupador -> 15
-		// peso ladrao -> 10
 		// peso rastro ladrao -> 1
 
 		int contador = 0;
-		for(int i = 0; i<=10; i+=10){
-			if(direcao.containsValue(100 + i)){ //contando quant. poupadores
-				contador+=200;
+
+		if(Temporizador.assaltoLiberado){
+			for(int i = 0; i<=10; i+=10){
+				if(direcao.containsValue(100 + i)){ //contando quant. poupadores
+					contador+=200;
+				}
 			}
 		}
-		/*
-		for(int i = 0; i<=30; i+=10){
-			if(direcao.containsValue(200 + i)){//contando quant. ladroes
-				contador+=10;
-			}
-		}
-		 */
 
 		if(contador == 0){ // caso nao tenha poupadores ou ladroes, vamos verificar se tem rastros
 			for(int i = 1; i<=5; i++){
@@ -206,11 +242,13 @@ public class Ladrao extends ProgramaLadrao {
 				}
 			}*/
 
+			int valor;
 			for (Map.Entry<int[], Integer> elementosDaDirecao : direcao.entrySet()) { //verifica obstaculos
-				if (elementosDaDirecao.getValue().equals(-2) || elementosDaDirecao.getValue().equals(1) || elementosDaDirecao.getValue().equals(3) || elementosDaDirecao.getValue().equals(4) || elementosDaDirecao.getValue().equals(5)) {
+				valor = elementosDaDirecao.getValue();
+				if (valor == -2 || valor == 1 || valor == 3 || valor == 4 || valor == 5) {
 					contador-=1;
 				}
-				if (elementosDaDirecao.getValue().equals(-1)){
+				else if (valor == -1){
 					contador -=5;
 				}
 
@@ -218,9 +256,9 @@ public class Ladrao extends ProgramaLadrao {
 				for (int i = 0; i < elementosDaDirecao.getKey().length; i++) {
 					valoresInteiros[i] = elementosDaDirecao.getKey()[i];
 				}
-				for (double[] posicao : ultimasPosicoes) {
-					double[] coordenadaReal = coordenadasRelativasParaAbsolutas(valoresInteiros);
 
+				double[] coordenadaReal = coordenadasRelativasParaAbsolutas(valoresInteiros, x ,y);
+				for (double[] posicao : ultimasPosicoes) {
 					if (Arrays.equals(posicao, coordenadaReal)) {
 						contador -= 2; // Subtrai um valor se a posição estiver nas últimas 5 posições.
 					}
