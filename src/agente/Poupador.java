@@ -6,7 +6,7 @@ public class Poupador extends ProgramaPoupador {
 	
 	public int acao() {
 		
-		return 1;
+		return (int) (Math.random() * 5);
 	}
 
 }

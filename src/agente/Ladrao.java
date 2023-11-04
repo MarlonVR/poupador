@@ -11,29 +11,88 @@ import static buscas.AStar.aStar;
 public class Ladrao extends ProgramaLadrao {
 
 	List<Node> caminho;
-	public int acao() {
+	private LinkedList<double[]> ultimasPosicoes = new LinkedList<>();
 
+	int[] chaveAux = {-100};
+
+	public double[] coordenadasRelativasParaAbsolutas(double[] coordenadasRelativas) {
+		double linhaAbsoluta = sensor.getPosicao().getY() - 2 + coordenadasRelativas[0];
+		double colunaAbsoluta = sensor.getPosicao().getX() - 2 + coordenadasRelativas[1];
+		return new double[]{colunaAbsoluta, linhaAbsoluta};
+	}
+
+	public int acao() {
+		double[] posicaoAtual = {sensor.getPosicao().getX(), sensor.getPosicao().getY()};
+		ultimasPosicoes.add(posicaoAtual);
+
+		if (ultimasPosicoes.size() > 10) {
+			ultimasPosicoes.removeFirst();
+		}
 		return andar();
 	}
 
 	public int andar() {
+		/*if(sensor.getPosicao().getX() == 0 && sensor.getPosicao().getY() == 0 || sensor.getPosicao().getX() == 0 && sensor.getPosicao().getY() == 29 || sensor.getPosicao().getX() == 29 && sensor.getPosicao().getY() == 0){
+			return 0; //fazendo os outros ladroes nao serem executados para nao atrapalhar no debug
+		}*/
+
 		if (caminho == null || caminho.isEmpty()) {
 			int[][] visao = getVisao();
-			caminho = aStar(visao, new Node(2, 2), heuristica(visao));
-			if (caminho != null) return caminho.remove(0).acao;
+			Node objetivo = heuristica(visao);
+
+			if(objetivo != null){
+				caminho = aStar(visao, new Node(2, 2), objetivo);
+				if (caminho != null) {
+					return caminho.remove(0).acao;
+				}
+			}
 		}
 		else {
 			return caminho.remove(0).acao;
 		}
-		return (int) (Math.random() * 5);
+
+		int direcao;
+		do{
+			direcao = (int) (Math.random() * 5);
+		}while (direcaoVisitada(direcao));
+		System.out.println("ALEATORIO EVITANDO DIRECAO JA VISITADA");
+		return direcao;
 	}
+	public boolean direcaoVisitada(int direcao) {
+		double[] coordenadasRelativas;
+		switch (direcao) {
+			case 1: // cima
+				coordenadasRelativas = new double[]{-1, 0};
+				break;
+			case 2: // baixo
+				coordenadasRelativas = new double[]{1, 0};
+				break;
+			case 3: // direita
+				coordenadasRelativas = new double[]{0, 1};
+				break;
+			case 4: // esquerda
+				coordenadasRelativas = new double[]{0, -1};
+				break;
+			default:
+				return false;
+		}
+
+		double[] coordenadaProxima = coordenadasRelativasParaAbsolutas(coordenadasRelativas);
+
+		for (double[] posicao : ultimasPosicoes) {
+			if (Arrays.equals(posicao, coordenadaProxima)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 
 	public Node heuristica(int[][] visao){
 		HashMap<int[], Integer> melhorDirecao = melhorDirecao(direcoes(visao));
 
 		ArrayList<int[]> posicoes = new ArrayList<>(); // posicoes dos elementos encontrados na melhorDirecao
 
-		int[] chaveAux = {-100}; // seguindo rastro
 		if(melhorDirecao.containsKey(chaveAux)){
 			switch (melhorDirecao.get(chaveAux)){
 				case 1:
@@ -55,7 +114,7 @@ public class Ladrao extends ProgramaLadrao {
 			}
 		}
 
-		int[] posicaoObjetivo = new int[2];
+		int[] posicaoObjetivo;
 
 		if(!posicoes.isEmpty()){ // verificar qual dos elementos esta mais perto
 			int menor = Manhattan(new int[] {2, 2}, posicoes.get(0));
@@ -69,15 +128,10 @@ public class Ladrao extends ProgramaLadrao {
 					posicaoObjetivo = posicoes.get(i);
 				}
 			}
-		}
-		else{
-			do {
-				posicaoObjetivo[0] = (int) (Math.random() * 5);
-				posicaoObjetivo[1] = (int) (Math.random() * 5);
-			} while (posicaoObjetivo[0] == 2 && posicaoObjetivo[1] == 2); // verificando se nao é a posição do proprio ladrao
-		}
 
-		return new Node(posicaoObjetivo[0], posicaoObjetivo[1]);
+			return new Node(posicaoObjetivo[0], posicaoObjetivo[1]);
+		}
+		return null;
 	}
 	public int Manhattan(int[] a, int[] b){ // calcular distancia
 		return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
@@ -109,10 +163,12 @@ public class Ladrao extends ProgramaLadrao {
 
 		if(bigger < 100){ // Se tiver somente rastro na visao
 			HashMap<int[], Integer> aux = new HashMap<int[], Integer>();
-			aux.put(new int []{-100}, index + 1);
+			aux.put(chaveAux, index + 1);
+			return aux;
 			// colocando -100 na chave para saber que o hashmap de retorno não é com valores da visao
 			// e sim do olfato. Sendo o seu valor o movimento a se fazer. (valores de 1 a 4)
 		}
+
 		return direcoes.get(index);
 	}
 
@@ -128,11 +184,13 @@ public class Ladrao extends ProgramaLadrao {
 				contador+=200;
 			}
 		}
+		/*
 		for(int i = 0; i<=30; i+=10){
 			if(direcao.containsValue(200 + i)){//contando quant. ladroes
 				contador+=10;
 			}
 		}
+		 */
 
 		if(contador == 0){ // caso nao tenha poupadores ou ladroes, vamos verificar se tem rastros
 			for(int i = 1; i<=5; i++){
@@ -147,10 +205,34 @@ public class Ladrao extends ProgramaLadrao {
 					return contador;
 				}
 			}*/
+
+			for (Map.Entry<int[], Integer> elementosDaDirecao : direcao.entrySet()) { //verifica obstaculos
+				if (elementosDaDirecao.getValue().equals(-2) || elementosDaDirecao.getValue().equals(1) || elementosDaDirecao.getValue().equals(3) || elementosDaDirecao.getValue().equals(4) || elementosDaDirecao.getValue().equals(5)) {
+					contador-=1;
+				}
+				if (elementosDaDirecao.getValue().equals(-1)){
+					contador -=5;
+				}
+
+				double[] valoresInteiros = new double[elementosDaDirecao.getKey().length]; // transformando em double para comparar
+				for (int i = 0; i < elementosDaDirecao.getKey().length; i++) {
+					valoresInteiros[i] = elementosDaDirecao.getKey()[i];
+				}
+				for (double[] posicao : ultimasPosicoes) {
+					double[] coordenadaReal = coordenadasRelativasParaAbsolutas(valoresInteiros);
+
+					if (Arrays.equals(posicao, coordenadaReal)) {
+						contador -= 2; // Subtrai um valor se a posição estiver nas últimas 5 posições.
+					}
+				}
+			}
+
 		}
 
 		return contador;
 	}
+
+
 	public ArrayList<HashMap<int[], Integer>> direcoes(int[][] visao) {
 		// Cima, baixo, direita, esquerda
 		//  0      1       2         3
@@ -167,10 +249,17 @@ public class Ladrao extends ProgramaLadrao {
 			}
 		}
 
-		esquerda.put(new int[] {2, 0}, visao[2][0]);
-		esquerda.put(new int[] {2, 1}, visao[2][1]);
-		direita.put(new int[] {2, 3}, visao[2][3]);
-		direita.put(new int[] {2, 4}, visao[2][4]);
+		for (int i = 0; i < 5; i++) {
+			for (int j = 0; j < 2; j++) {
+				esquerda.put(new int[] {i, j}, visao[i][j]);
+			}
+		}
+
+		for (int i = 0; i < 5; i++) {
+			for (int j = 3; j < 5; j++) {
+				direita.put(new int[] {i, j}, visao[i][j]);
+			}
+		}
 
 		for (int i = 3; i < 5; i++) {
 			for (int j = 0; j < 5; j++) {
