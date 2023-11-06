@@ -1,17 +1,125 @@
 package agente;
 
 import algoritmo.ProgramaLadrao;
-import buscas.Node;
-
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 
-import static buscas.AStar.aStar;
 
 public class Ladrao extends ProgramaLadrao {
+
+	public static class Node {
+		public int linha, coluna;  // Coordenadas do nó no grafo
+		int g;     // Custo real do início até este nó
+		int h;     // Estimativa heurística do custo deste nó até o destino
+		Node parent;  // Nó pai no caminho
+		public int acao;
+		public Node(int x, int y) {
+			this.linha = x;
+			this.coluna = y;
+		}
+
+		public int f() {
+			return g + h;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (obj == null || getClass() != obj.getClass()) return false;
+			Node node = (Node) obj;
+			return linha == node.linha && coluna == node.coluna;
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(linha, coluna);
+		}
+	}
+	public class AStar {
+		public static List<Node> aStar(int[][] mapa, Node inicio, Node objetivo) {
+			Set<Node> aberto = new HashSet<>();
+			Set<Node> fechado = new HashSet<>();
+			aberto.add(inicio);
+
+			while (!aberto.isEmpty()) {
+				Node atual = null;
+				for (Node node : aberto) {
+					if (atual == null || node.f() < atual.f()) {
+						atual = node;
+					}
+				}
+
+				if (atual.equals(objetivo)) {
+					return reconstruirCaminho(atual);
+				}
+
+				aberto.remove(atual);
+				fechado.add(atual);
+
+				for (Node vizinho : getVizinhos(atual, mapa)) {
+					if (fechado.contains(vizinho)) {
+						continue;
+					}
+
+					int custoG = atual.g + 1;  // Distância entre nós é 1
+					// custo do nó atual para o vizinho
+
+					if (!aberto.contains(vizinho) || custoG < vizinho.g) {
+						vizinho.parent = atual;
+						vizinho.g = custoG;
+						vizinho.h = heuristica(vizinho, objetivo);
+						aberto.add(vizinho);
+					}
+				}
+			}
+
+			return null;  // Caminho não encontrado
+		}
+
+		public static List<Node> reconstruirCaminho(Node current) {
+			List<Node> path = new ArrayList<>();
+			while (current != null) {
+				path.add(current);
+				current = current.parent;
+			}
+			Collections.reverse(path);
+			return path;
+		}
+
+		public static int heuristica(Node a, Node b) {
+			return Math.abs(a.linha - b.linha) + Math.abs(a.coluna - b.coluna);  // Heurística de Manhattan
+		}
+
+		public static List<Node> getVizinhos(Node node, int[][] mapa) {
+			List<Node> vizinhos = new ArrayList<>();
+			int linhas = mapa.length;
+			int colunas = mapa[0].length;
+			int x = node.linha;
+			int y = node.coluna;
+
+			if (x > 0 && mapa[x - 1][y] == 0 || x > 0 && mapa[x - 1][y] >= 100 && mapa[x - 1][y] < 200) { // cima
+				vizinhos.add(new Node(x - 1, y));
+				vizinhos.get(vizinhos.size()-1).acao = 1;
+			}
+			if (x < linhas - 1 && mapa[x + 1][y] == 0 || x < linhas - 1 && mapa[x + 1][y] >= 100 && mapa[x + 1][y] < 200) { // baixo
+				vizinhos.add(new Node(x + 1, y));
+				vizinhos.get(vizinhos.size()-1).acao = 2;
+			}
+			if (y > 0 && mapa[x][y - 1] == 0 || y > 0 && mapa[x][y - 1] >= 100 && mapa[x][y - 1] < 200) { // esquerda
+				vizinhos.add(new Node(x, y - 1));
+				vizinhos.get(vizinhos.size()-1).acao = 4;
+			}
+			if (y < colunas - 1 && mapa[x][y + 1] == 0 || y < colunas - 1 && mapa[x][y + 1] >= 100 && mapa[x][y + 1] < 200) { // direita
+				vizinhos.add(new Node(x, y + 1));
+				vizinhos.get(vizinhos.size()-1).acao = 3;
+			}
+
+			return vizinhos;
+		}
+	}
 
 	List<Node> caminho;
 	private LinkedList<double[]> ultimasPosicoes = new LinkedList<>();
@@ -70,16 +178,12 @@ public class Ladrao extends ProgramaLadrao {
 	}
 
 	public int andar() {
-		/*if(sensor.getPosicao().getX() == 0 && sensor.getPosicao().getY() == 0 || sensor.getPosicao().getX() == 0 && sensor.getPosicao().getY() == 29 || sensor.getPosicao().getX() == 29 && sensor.getPosicao().getY() == 0){
-			return 0; //fazendo os outros ladroes nao serem executados para nao atrapalhar no debug
-		}*/
-
 		if (caminho == null || caminho.isEmpty()) {
 			int[][] visao = getVisao();
 			Node objetivo = heuristica(visao);
 
 			if(objetivo != null){
-				caminho = aStar(visao, new Node(2, 2), objetivo);
+				caminho = AStar.aStar(visao, new Node(2, 2), objetivo);
 				if (caminho != null) {
 					int aux = caminho.remove(0).acao;
 					return caminho.remove(0).acao;
@@ -247,7 +351,7 @@ public class Ladrao extends ProgramaLadrao {
 			for (Map.Entry<int[], Integer> elementosDaDirecao : direcao.entrySet()) { //verifica obstaculos
 				valor = elementosDaDirecao.getValue();
 				if (valor == -2 || valor == 1 || valor == 3 || valor == 4 || valor == 5) {
-					contador-=1;
+					contador--;
 				}
 				else if (valor == -1){
 					contador -=5;
