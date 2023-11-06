@@ -13,30 +13,17 @@ import static buscas.AStar.aStar;
 
 public class Ladrao extends ProgramaLadrao {
 
-	public static class Temporizador {
-		static private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(7);
-		private int moedas;
-		static boolean assaltoLiberado = true;
-		public static void iniciarTemp() {
-			// Comando para iniciar uma tarefa após um atraso de 5 segundos
-			final Runnable runnable = new Runnable() {
-				public void run() {
-					System.out.println("Poupador assaltado!");
-					assaltoLiberado = true;
-				}
-			};
-
-			// Agendar a tarefa após 5 segundos
-			scheduler.schedule(runnable, 5, TimeUnit.SECONDS);
-		}
-	}
 	List<Node> caminho;
 	private LinkedList<double[]> ultimasPosicoes = new LinkedList<>();
 	int[] chaveAux = {-100};
 	double x,y;
 	int moedas = 0;
 
-	Timer timer = new Timer();
+	private Timer timer;
+	private final Object lock = new Object();
+	TimerTask task;
+
+	Boolean assaltoLiberado = true;
 
 	public double[] coordenadasRelativasParaAbsolutas(double[] coordenadasRelativas, double x, double y) {
 		double linhaAbsoluta = sensor.getPosicao().getY() - 2 + coordenadasRelativas[0];
@@ -45,17 +32,31 @@ public class Ladrao extends ProgramaLadrao {
 	}
 
 	public int acao() {
-		if(moedas < sensor.getNumeroDeMoedas()){
-			try{
-				Temporizador.assaltoLiberado = false;
-				Temporizador.iniciarTemp();
-			}catch (Exception e){
-				//
+		synchronized(lock) {
+			if(moedas < sensor.getNumeroDeMoedas() && (task == null || task.scheduledExecutionTime() == 0)) {
+				// Cancela a task anterior se ela existir
+				if (task != null) {
+					task.cancel();
+				}
+				task = new TimerTask() {
+					@Override
+					public void run() {
+						synchronized(lock) {
+							System.out.println("Poupador assaltado!");
+							assaltoLiberado = true;
+							task = null; // Reset task
+						}
+					}
+				};
+				if (timer == null) {
+					timer = new Timer();
+				}
+				assaltoLiberado = false;
+				timer.schedule(task, 5000);
 			}
 		}
 
 		moedas = sensor.getNumeroDeMoedas();
-
 		x = sensor.getPosicao().getX();
 		y = sensor.getPosicao().getY();
 
@@ -220,7 +221,7 @@ public class Ladrao extends ProgramaLadrao {
 
 		int contador = 0;
 
-		if(Temporizador.assaltoLiberado){
+		if(assaltoLiberado){
 			for(int i = 0; i<=10; i+=10){
 				if(direcao.containsValue(100 + i)){ //contando quant. poupadores
 					contador+=200;
