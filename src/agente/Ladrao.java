@@ -2,10 +2,6 @@ package agente;
 
 import algoritmo.ProgramaLadrao;
 import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
 
 
 public class Ladrao extends ProgramaLadrao {
@@ -124,7 +120,7 @@ public class Ladrao extends ProgramaLadrao {
 	List<Node> caminho;
 	private LinkedList<double[]> ultimasPosicoes = new LinkedList<>();
 	int[] chaveAux = {-100};
-	double x,y;
+	double coluna, linha;
 	int moedas = 0;
 
 	private Timer timer;
@@ -132,43 +128,17 @@ public class Ladrao extends ProgramaLadrao {
 	TimerTask task;
 
 	Boolean assaltoLiberado = true;
+	Boolean poupadorNaMira = false;
 
-	public double[] coordenadasRelativasParaAbsolutas(double[] coordenadasRelativas, double x, double y) {
+	public double[] coordenadasRelativasParaAbsolutas(double[] coordenadasRelativas, double coluna, double linha) {
 		double linhaAbsoluta = sensor.getPosicao().getY() - 2 + coordenadasRelativas[0];
 		double colunaAbsoluta = sensor.getPosicao().getX() - 2 + coordenadasRelativas[1];
 		return new double[]{colunaAbsoluta, linhaAbsoluta};
 	}
 
 	public int acao() {
-		synchronized(lock) {
-			if(moedas < sensor.getNumeroDeMoedas() && (task == null || task.scheduledExecutionTime() == 0)) {
-				// Cancela a task anterior se ela existir
-				if (task != null) {
-					task.cancel();
-				}
-				task = new TimerTask() {
-					@Override
-					public void run() {
-						synchronized(lock) {
-							System.out.println("Poupador assaltado!");
-							assaltoLiberado = true;
-							task = null; // Reset task
-						}
-					}
-				};
-				if (timer == null) {
-					timer = new Timer();
-				}
-				assaltoLiberado = false;
-				timer.schedule(task, 5000);
-			}
-		}
+		double[] posicaoAtual = {sensor.getPosicao().getX(), sensor.getPosicao().getY()};
 
-		moedas = sensor.getNumeroDeMoedas();
-		x = sensor.getPosicao().getX();
-		y = sensor.getPosicao().getY();
-
-		double[] posicaoAtual = {x, y};
 		ultimasPosicoes.add(posicaoAtual);
 
 		if (ultimasPosicoes.size() > 10) {
@@ -178,6 +148,11 @@ public class Ladrao extends ProgramaLadrao {
 	}
 
 	public int andar() {
+		if(caminho != null && caminho.isEmpty() && poupadorNaMira){
+			poupadorNaMira = false;
+			temporizadorAssalto();
+		}
+
 		if (caminho == null || caminho.isEmpty()) {
 			int[][] visao = getVisao();
 			Node objetivo = heuristica(visao);
@@ -220,7 +195,7 @@ public class Ladrao extends ProgramaLadrao {
 				return false;
 		}
 
-		double[] coordenadaProxima = coordenadasRelativasParaAbsolutas(coordenadasRelativas, x, y);
+		double[] coordenadaProxima = coordenadasRelativasParaAbsolutas(coordenadasRelativas, coluna, linha);
 
 		for (double[] posicao : ultimasPosicoes) {
 			if (Arrays.equals(posicao, coordenadaProxima)) {
@@ -230,7 +205,38 @@ public class Ladrao extends ProgramaLadrao {
 		return false;
 	}
 
+	public void temporizadorAssalto(){
+		double[] posicaoAnterior = new double[2];
 
+		if(!ultimasPosicoes.isEmpty()){
+			posicaoAnterior = ultimasPosicoes.getLast();
+		}
+		double[] posicaoAtual = {sensor.getPosicao().getX(), sensor.getPosicao().getY()};
+
+		synchronized(lock) {
+
+			if(moedas < sensor.getNumeroDeMoedas() && (task == null || task.scheduledExecutionTime() == 0) || posicaoAnterior[0] == posicaoAtual[0] && posicaoAnterior[1] == posicaoAtual[1]) {
+				if (task != null) {
+					task.cancel();
+				}
+				task = new TimerTask() {
+					@Override
+					public void run() {
+						synchronized(lock) {
+							System.out.println("Poupador assaltado!");
+							assaltoLiberado = true;
+							task = null;
+						}
+					}
+				};
+				if (timer == null) {
+					timer = new Timer();
+				}
+				assaltoLiberado = false;
+				timer.schedule(task, 5000);
+			}
+		}
+	}
 	public Node heuristica(int[][] visao){
 		HashMap<int[], Integer> melhorDirecao = melhorDirecao(direcoes(visao));
 
@@ -329,6 +335,7 @@ public class Ladrao extends ProgramaLadrao {
 			for(int i = 0; i<=10; i+=10){
 				if(direcao.containsValue(100 + i)){ //contando quant. poupadores
 					contador+=200;
+					poupadorNaMira = true;
 				}
 			}
 		}
@@ -362,7 +369,7 @@ public class Ladrao extends ProgramaLadrao {
 					valoresInteiros[i] = elementosDaDirecao.getKey()[i];
 				}
 
-				double[] coordenadaReal = coordenadasRelativasParaAbsolutas(valoresInteiros, x ,y);
+				double[] coordenadaReal = coordenadasRelativasParaAbsolutas(valoresInteiros, coluna, linha);
 				for (double[] posicao : ultimasPosicoes) {
 					if (Arrays.equals(posicao, coordenadaReal)) {
 						contador -= 2; // Subtrai um valor se a posição estiver nas últimas 5 posições.
@@ -522,12 +529,5 @@ public class Ladrao extends ProgramaLadrao {
 		}
 
 		return matriz;
-	}
-	public void imprimirVisao(int[][] visao){
-		for(int i = 0; i < visao.length; i++){
-			for(int j = 0; j < visao.length; j++){
-				System.out.print(visao[i][j] + " ");
-			}System.out.println();
-		}System.out.println();
 	}
 }
