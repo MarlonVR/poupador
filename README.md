@@ -26,3 +26,7 @@ Este projeto é parte da disciplina de Inteligência Artificial da Universidade 
 
 ## Termino da Partida
 - O jogo termina quando o tempo se esgota, e o vencedor é o agente com mais moedas coletadas.
+
+## Equipe
+- Marlon Gabriel Vaz Rocha
+- Pedro Augusto Araújo Cid Filho
